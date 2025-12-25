@@ -127,11 +127,12 @@ class Evaluator(object):
         """ Master function to run this rather than having it in like 5 different places. """
         # Run beam generation to get output. 
         encoded = encoder("fwd", x=x1_, lengths=len1_, causal=False)
+        max_beam_len = getattr(self.params, 'max_output_len', 4096)
         _, _, generations= decoder.generate_beam(encoded.transpose(0, 1), len1_,
                                                     beam_size=self.params.beam_size,
                                                     length_penalty=self.params.beam_length_penalty,
                                                     early_stopping=self.params.beam_early_stopping,
-                                                    max_len=4096)
+                                                    max_len=max_beam_len)
         # Analyze beam output
         inputs = []
         for i in range(len(generations)):
@@ -226,9 +227,29 @@ class Evaluator(object):
         invert = np.vectorize(lambda x: 1 - x)
 
         # 3 methods of testing for matching: mean, mode, and softmax mean
-        pred_bin1 = np.vectorize(lambda x: 0 if x > np.mean(pred_final) else 1)(pred_final) 
-        pred_bin2 = np.vectorize(lambda x: 0 if x != stats.mode(pred_final)[0][0] else 1)(pred_final)
-        pred_bin3 = np.vectorize(lambda x: 0 if x > np.mean(pred_softmax) else 1)(pred_softmax)
+        pred_arr = np.array(pred_final)
+        try:
+            pred_bin1 = np.where(pred_arr > np.mean(pred_arr), 0, 1)
+        except Exception as e:
+            logger.warning(f"Error computing pred_bin1: {e}; pred_final={pred_final}")
+            pred_bin1 = np.zeros_like(pred_arr, dtype=int)
+
+        # robust mode computation (handle scalar/empty/shape changes)
+        try:
+            mode_res = stats.mode(pred_arr)
+            mode_vals = np.array(mode_res.mode).ravel()
+            mode_val = mode_vals[0] if mode_vals.size > 0 else int(mode_res.mode)
+        except Exception as e:
+            logger.warning(f"Error computing mode for pred_final: {e}; pred_final={pred_final}")
+            mode_val = int(pred_arr[0]) if pred_arr.size > 0 else 0
+        pred_bin2 = np.where(pred_arr != mode_val, 0, 1)
+
+        try:
+            pred_soft_arr = np.array(pred_softmax)
+            pred_bin3 = np.where(pred_soft_arr > np.mean(pred_soft_arr), 0, 1)
+        except Exception as e:
+            logger.warning(f"Error computing pred_bin3: {e}; pred_softmax={pred_softmax}")
+            pred_bin3 = np.zeros_like(pred_arr, dtype=int)
 
         bin1_match = sum((pred_bin1 == self.env.generator.secrets[sec_idx]).astype(int))
         bin2_match = sum((pred_bin2 == self.env.generator.secrets[sec_idx]).astype(int))
@@ -795,6 +816,8 @@ class Evaluator(object):
             percentiles.append(pval)
         # Get the > 100% values
         percentiles.append(100) # Everything else is above 1.
+        # convert to plain Python floats so that ast.literal_eval can parse the string safely
+        percentiles = [float(p) for p in percentiles]
         percQ10 = percentiles[0]
         scores[f"{data_type}_{task}_percs_diff"] = str(percentiles) # can use this as a stopping critirion if you want. 
         logger.info(f'percentiles of %Q difference between tgt and hyp: {str(list(percentiles))}')
