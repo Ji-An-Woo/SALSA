@@ -336,6 +336,28 @@ if __name__ == '__main__':
             params.exp_id = 'debug_%08i' % random.randint(0, 100000000)
         params.debug_slurm = True
 
+    # Auto-adjust model size for larger N per paper (STRICT override, option A):
+    # For n < 100 use 1024/512 embeddings and 16/4 heads (encoder/decoder)
+    # For n >= 100 use 1536/512 embeddings and 32/4 heads (encoder/decoder)
+    # This STRICTLY forces values to match the paper even if the user supplied other values.
+    #인코더 디코더 및 임베딩 차원 조정
+    try:
+        if params.N >= 100:
+            params.enc_emb_dim = 1536
+            params.n_enc_heads = 32
+            params.dec_emb_dim = 512
+            params.n_dec_heads = 4
+            print(f"[AUTO] N >= 100: forcing enc_emb_dim={params.enc_emb_dim}, n_enc_heads={params.n_enc_heads}, dec_emb_dim={params.dec_emb_dim}, n_dec_heads={params.n_dec_heads}", file=sys.stderr)
+        else:
+            params.enc_emb_dim = 1024
+            params.n_enc_heads = 16
+            params.dec_emb_dim = 512
+            params.n_dec_heads = 4
+            print(f"[AUTO] N < 100: forcing enc_emb_dim={params.enc_emb_dim}, n_enc_heads={params.n_enc_heads}, dec_emb_dim={params.dec_emb_dim}, n_dec_heads={params.n_dec_heads}", file=sys.stderr)
+    except Exception:
+        # be robust to missing attributes
+        pass
+
     # check parameters
     check_model_params(params)
 
