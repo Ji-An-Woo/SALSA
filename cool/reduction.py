@@ -91,11 +91,13 @@ def run_one_reduction(origA: np.array, seed, Q, lll_penalty, reduction_chunk_siz
 def make_n_reduced_samples(
     origA, how_many, Q, reduction_chunk_size=None, lll_penalty=10, n_workers=50, reduction_fn=reduce_with_flatter
 ):
+    from multiprocessing import Pool
     from tqdm import tqdm
     import functools
 
     Rs = []
     subsets = []
+    pool = Pool(n_workers)
     run_one = functools.partial(
         run_one_reduction,
         origA,
@@ -104,17 +106,10 @@ def make_n_reduced_samples(
         lll_penalty=lll_penalty,
         reduction_fn=reduction_fn,
     )
-    n_jobs = how_many // reduction_chunk_size // 2
-    if n_workers is None or n_workers <= 1:
-        for i in tqdm(range(n_jobs)):
-            R_i, subset = run_one(i)
-            Rs.append(R_i)
-            subsets.append(subset)
-    else:
-        from multiprocessing import Pool
-        with Pool(n_workers) as pool:
-            for R_i, subset in tqdm(pool.imap_unordered(run_one, range(n_jobs))):
-                Rs.append(R_i)
-                subsets.append(subset)
+    for R_i, subset in tqdm(
+        pool.imap_unordered(run_one, range(how_many // reduction_chunk_size // 2))
+    ):
+        Rs.append(R_i)
+        subsets.append(subset)
 
     return np.stack(Rs), np.stack(subsets)
