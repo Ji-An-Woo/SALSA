@@ -132,3 +132,4 @@ checkpoint/
 checkpoints/
 notebooks/checkpoints/
 
+logs/
