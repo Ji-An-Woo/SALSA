@@ -30,7 +30,11 @@ def parse_log(log_path):
         except json.JSONDecodeError:
             continue
 
-        epochs.append(_safe_float(data.get('epoch')))
+        e = _safe_float(data.get('epoch'))
+        if not math.isnan(e):
+            epochs.append(int(e))
+        else:
+            epochs.append(math.nan)
         loss.append(_safe_float(data.get('valid_lattice_xe_loss')))
         beam_acc.append(_safe_float(data.get('valid_lattice_beam_acc')))
         perfect.append(_safe_float(data.get('valid_lattice_perfect')))
@@ -88,6 +92,14 @@ def plot_metrics(log_path, output_path=None):
     axes[1].set_ylabel('0.1Q accuracy (%)')
     axes[1].grid(True, alpha=0.3)
     axes[1].legend()
+
+    # Ensure x-axis labels are formatted as integers
+    try:
+        from matplotlib.ticker import FormatStrFormatter
+        axes[0].xaxis.set_major_formatter(FormatStrFormatter('%d'))
+        axes[1].xaxis.set_major_formatter(FormatStrFormatter('%d'))
+    except Exception:
+        pass
 
     output_path = Path(output_path) if output_path else default_output_path(log_path)
     fig.tight_layout()

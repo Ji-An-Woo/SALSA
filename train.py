@@ -340,7 +340,7 @@ if __name__ == '__main__':
     # For n < 100 use 1024/512 embeddings and 16/4 heads (encoder/decoder)
     # For n >= 100 use 1536/512 embeddings and 32/4 heads (encoder/decoder)
     # This STRICTLY forces values to match the paper even if the user supplied other values.
-    #인코더 디코더 및 임베딩 차원 조정
+    #인코더 디코더 및 임베딩 차원 조정 조건마다 적용되도록 설정
     try:
         if params.N >= 100:
             params.enc_emb_dim = 1536
